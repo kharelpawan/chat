@@ -16,9 +16,16 @@
 <body>
     <h1>Random Chat</h1>
     <p>Online Users: <span id="onlineCount">0</span></p>
-    <button onclick="startChat()">Start</button>
-    <button onclick="skipUser()" disabled>Skip</button>
-    <button onclick="stopChat()" disabled>Stop</button>
+
+    <div id="usernameSection">
+        <p>Enter your name:</p>
+        <input type="text" id="usernameInput" placeholder="Your name">
+        <button onclick="setUsername()">Set Name</button>
+    </div>
+
+    <button onclick="startChat()" disabled id="startButton">Start</button>
+    <button onclick="skipUser()" disabled id="skipButton">Skip</button>
+    <button onclick="stopChat()" disabled id="stopButton">Stop</button>
 
     <div id="chat">
         <p>Connected to: <span id="partnerInfo">None</span></p>
@@ -29,21 +36,22 @@
 
     <script>
         let socket = new WebSocket(`wss://chat-ble3.onrender.com`);
+        let username = null;
         let connected = false;
-        let partnerId = null;
+        let partnerName = null;
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             const messagesDiv = document.getElementById('messages');
 
             if (data.type === 'connected') {
-                partnerId = data.userId;
-                document.getElementById('partnerInfo').innerText = `User ${partnerId}`;
-                messagesDiv.innerHTML = `<p>Connected to <strong>User ${partnerId}</strong>!</p>`;
+                partnerName = data.partnerName;
+                document.getElementById('partnerInfo').innerText = partnerName;
+                messagesDiv.innerHTML = `<p>Connected to <strong>${partnerName}</strong>!</p>`;
                 connected = true;
                 document.getElementById('chat').style.display = 'block';
-                document.querySelector("button[onclick='skipUser()']").disabled = false;
-                document.querySelector("button[onclick='stopChat()']").disabled = false;
+                document.getElementById('skipButton').disabled = false;
+                document.getElementById('stopButton').disabled = false;
             } else if (data.type === 'message') {
                 messagesDiv.innerHTML += `<p><strong>${data.sender}:</strong> ${data.text}</p>`;
             } else if (data.type === 'disconnected') {
@@ -52,12 +60,25 @@
                 document.getElementById('partnerInfo').innerText = "None";
             } else if (data.type === 'online') {
                 document.getElementById('onlineCount').innerText = data.count;
+            } else if (data.type === 'noUser') {
+                messagesDiv.innerHTML = '<p><em>No users available to chat.</em></p>';
+                document.getElementById('partnerInfo').innerText = "None";
             }
 
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         };
 
+        function setUsername() {
+            username = document.getElementById('usernameInput').value.trim();
+            if (username) {
+                socket.send(JSON.stringify({ type: 'setName', username }));
+                document.getElementById('usernameSection').style.display = 'none';
+                document.getElementById('startButton').disabled = false;
+            }
+        }
+
         function startChat() {
+            if (!username) return alert("Please enter your name first.");
             socket.send(JSON.stringify({ type: 'start' }));
         }
 
