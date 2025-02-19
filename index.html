@@ -5,80 +5,152 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Random Chat</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        #chat { width: 80%; margin: auto; padding: 20px; border: 1px solid #ccc; display: none; }
-        #messages { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; text-align: left; }
-        input { width: 70%; padding: 10px; }
-        button { padding: 10px; margin: 5px; }
-        #partnerInfo { font-weight: bold; }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f5f5dc; /* Light beige background like Omegle */
+            margin: 0;
+            padding: 0;
+        }
+
+        #chatContainer {
+            width: 50%;
+            margin: auto;
+            background-color: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            background: #fff;
+            font-size: 14px;
+        }
+
+        #messages p {
+            margin: 5px 0;
+        }
+
+        .you {
+            color: blue;
+            font-weight: bold;
+        }
+
+        .stranger {
+            color: red;
+            font-weight: bold;
+        }
+
+        input {
+            width: 75%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        .blueButton {
+            background-color: #3498db;
+        }
+
+        .redButton {
+            background-color: #e74c3c;
+        }
+
+        .redButton:hover {
+            background-color: #c0392b;
+        }
+
+        .newChatSection {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f1f1f1;
+            border: 1px solid #ccc;
+            font-size: 12px;
+        }
+
+        .link {
+            color: #0077cc;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
-    <h1>Random Chat</h1>
+
+    <h1 style="color: #ff6600;">Guff Junction</h1>
+
     <p>Online Users: <span id="onlineCount">0</span></p>
 
-    <div id="usernameSection">
-        <p>Enter your name:</p>
-        <input type="text" id="usernameInput" placeholder="Your name">
-        <button onclick="setUsername()">Set Name</button>
-    </div>
-
-    <button onclick="startChat()" disabled id="startButton">Start</button>
-    <button onclick="skipUser()" disabled id="skipButton">Skip</button>
-    <button onclick="stopChat()" disabled id="stopButton">Stop</button>
-
-    <div id="chat">
-        <p>Connected to: <span id="partnerInfo">None</span></p>
+    <div id="chatContainer">
         <div id="messages"></div>
         <input id="messageInput" type="text" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
-        <button onclick="sendMessage()">Send</button>
+        <button class="blueButton" onclick="sendMessage()">Send</button>
     </div>
+
+    <button class="blueButton" onclick="startChat()">New Chat</button>
+    <button class="redButton" onclick="skipUser()">Skip</button>
+    <button class="redButton" onclick="stopChat()">Stop</button>
+
+<!--     <div class="newChatSection">
+        <input type="checkbox"> Find strangers with common interests (<a href="#" class="link">Enable</a>)<br>
+        <span style="color: orange; font-weight: bold;">Great chat?</span> 
+        Save the log: <a href="#" class="link">Get a link</a> • 
+        <a href="#" class="link">Select all</a> • 
+        Or post log to: 
+        <a href="#" class="link">Facebook</a> • 
+        <a href="#" class="link">Tumblr</a> • 
+        <a href="#" class="link">Twitter</a> • 
+        <a href="#" class="link">Reddit</a>
+    </div> -->
 
     <script>
         let socket = new WebSocket(`wss://chat-ble3.onrender.com`);
-        let username = null;
         let connected = false;
-        let partnerName = null;
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             const messagesDiv = document.getElementById('messages');
 
             if (data.type === 'connected') {
-                partnerName = data.partnerName;
-                document.getElementById('partnerInfo').innerText = partnerName;
-                messagesDiv.innerHTML = `<p>Connected to <strong>${partnerName}</strong>!</p>`;
+                messagesDiv.innerHTML = `<p><strong>Connected to a stranger!</strong></p>`;
                 connected = true;
-                document.getElementById('chat').style.display = 'block';
-                document.getElementById('skipButton').disabled = false;
-                document.getElementById('stopButton').disabled = false;
             } else if (data.type === 'message') {
-                messagesDiv.innerHTML += `<p><strong>${data.sender}:</strong> ${data.text}</p>`;
+                messagesDiv.innerHTML += `<p class="stranger">${data.text}</p>`;
             } else if (data.type === 'disconnected') {
-                messagesDiv.innerHTML += '<p><em>Partner disconnected.</em></p>';
+                messagesDiv.innerHTML += '<p><em>Stranger disconnected.</em></p>';
                 connected = false;
-                document.getElementById('partnerInfo').innerText = "None";
             } else if (data.type === 'online') {
                 document.getElementById('onlineCount').innerText = data.count;
-            } else if (data.type === 'noUser') {
-                messagesDiv.innerHTML = '<p><em>No users available to chat.</em></p>';
-                document.getElementById('partnerInfo').innerText = "None";
             }
-
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         };
 
-        function setUsername() {
-            username = document.getElementById('usernameInput').value.trim();
-            if (username) {
-                socket.send(JSON.stringify({ type: 'setName', username }));
-                document.getElementById('usernameSection').style.display = 'none';
-                document.getElementById('startButton').disabled = false;
-            }
-        }
-
         function startChat() {
-            if (!username) return alert("Please enter your name first.");
             socket.send(JSON.stringify({ type: 'start' }));
         }
 
@@ -87,7 +159,7 @@
             const message = messageInput.value.trim();
             if (!message || !connected) return;
 
-            document.getElementById('messages').innerHTML += `<p><strong>You:</strong> ${message}</p>`;
+            document.getElementById('messages').innerHTML += `<p class="you">You: ${message}</p>`;
             socket.send(JSON.stringify({ type: 'message', text: message }));
             messageInput.value = '';
         }
@@ -98,13 +170,12 @@
 
         function stopChat() {
             socket.send(JSON.stringify({ type: 'stop' }));
-            document.getElementById('chat').style.display = 'none';
-            document.getElementById('partnerInfo').innerText = "None";
         }
 
         function handleKeyPress(event) {
             if (event.key === "Enter") sendMessage();
         }
     </script>
+
 </body>
 </html>
