@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #chat { width: 80%; margin: auto; padding: 20px; border: 1px solid #ccc; }
+        #messages { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; }
+        input { width: 70%; padding: 10px; }
+        button { padding: 10px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Random Chat</h1>
+    <p>Online Users: <span id="onlineCount">0</span></p>
+    <button onclick="startChat()">Start</button>
+    <button onclick="skipUser()">Skip</button>
+    <button onclick="stopChat()">Stop</button>
+    <div id="chat">
+        <div id="messages"></div>
+        <input id="messageInput" type="text" placeholder="Type a message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+    <script>
+        let socket = new WebSocket(`ws://${window.location.host}`);
+        let connected = false;
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'connected') {
+                document.getElementById('messages').innerHTML = '<p>Connected to a new user!</p>';
+                connected = true;
+            } else if (data.type === 'message') {
+                document.getElementById('messages').innerHTML += `<p>${data.text}</p>`;
+            } else if (data.type === 'disconnected') {
+                document.getElementById('messages').innerHTML += '<p>Partner disconnected.</p>';
+                connected = false;
+            } else if (data.type === 'online') {
+                document.getElementById('onlineCount').innerText = data.count;
+            }
+        };
+
+        function startChat() {
+            socket.send(JSON.stringify({ type: 'find' }));
+        }
+
+        function sendMessage() {
+            const message = document.getElementById('messageInput').value;
+            document.getElementById('messages').innerHTML += `<p>You: ${message}</p>`;
+            socket.send(JSON.stringify({ type: 'message', text: message }));
+        }
+
+        function skipUser() {
+            socket.send(JSON.stringify({ type: 'skip' }));
+        }
+
+        function stopChat() {
+            socket.send(JSON.stringify({ type: 'stop' }));
+        }
+    </script>
+</body>
+</html>
