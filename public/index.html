@@ -28,7 +28,7 @@
     </div>
 
     <script>
-        let socket = new WebSocket(`ws://${window.location.host}`);
+        let socket = new WebSocket(`ws://chat-ble3.onrender.com/`);
         let connected = false;
 
         socket.onmessage = (event) => {
