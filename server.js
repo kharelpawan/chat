@@ -7,18 +7,13 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let users = []; // List of connected users
-let waitingUsers = []; // Queue for pairing
-
-// Function to generate a random username
-function generateUsername() {
-    const adjectives = ["Fast", "Happy", "Mysterious", "Clever", "Brave"];
-    const nouns = ["Tiger", "Eagle", "Ninja", "Panda", "Wizard"];
-    return `${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
-}
+let users = [];
+let waitingUsers = [];
+let userCount = 0; // For assigning sequential IDs
 
 wss.on('connection', (socket) => {
-    socket.username = generateUsername();
+    userCount++;
+    socket.userId = userCount; // Assign sequential user ID
     users.push(socket);
     updateOnlineCount();
 
@@ -28,7 +23,7 @@ wss.on('connection', (socket) => {
         if (data.type === 'start') {
             findPartner(socket);
         } else if (data.type === 'message' && socket.partner) {
-            socket.partner.send(JSON.stringify({ type: 'message', text: data.text, sender: socket.username }));
+            socket.partner.send(JSON.stringify({ type: 'message', text: data.text, sender: `User ${socket.userId}` }));
         } else if (data.type === 'skip') {
             disconnect(socket, true);
             findPartner(socket);
@@ -44,15 +39,18 @@ wss.on('connection', (socket) => {
 
 function findPartner(socket) {
     if (waitingUsers.length > 0) {
-        const partner = waitingUsers.pop();
+        // Get a random user from waiting list
+        const randomIndex = Math.floor(Math.random() * waitingUsers.length);
+        const partner = waitingUsers.splice(randomIndex, 1)[0];
+
         socket.partner = partner;
         partner.partner = socket;
 
-        const connectMsg = JSON.stringify({ type: 'connected', username: partner.username });
-        const partnerMsg = JSON.stringify({ type: 'connected', username: socket.username });
+        const connectMsg1 = JSON.stringify({ type: 'connected', userId: partner.userId });
+        const connectMsg2 = JSON.stringify({ type: 'connected', userId: socket.userId });
 
-        socket.send(connectMsg);
-        partner.send(partnerMsg);
+        socket.send(connectMsg1);
+        partner.send(connectMsg2);
     } else {
         waitingUsers.push(socket);
     }
