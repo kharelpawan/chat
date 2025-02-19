@@ -7,15 +7,18 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let users = [];
-let waitingUsers = [];
-let userCount = 0; // Sequential User ID assignment
+let users = new Map();  // Stores all users by ID
+let waitingUsers = [];  // Queue of users waiting for a chat
+let userCount = 0;  // Assigns unique user IDs
 
 wss.on('connection', (socket) => {
     userCount++;
-    socket.userId = userCount; // Assign unique ID
-    socket.username = null; // Will be assigned by the user
-    users.push(socket);
+    const userId = userCount;
+    socket.userId = userId;
+    socket.username = null;
+    socket.partner = null;
+
+    users.set(userId, socket);
     updateOnlineCount();
 
     socket.on('message', (message) => {
@@ -26,9 +29,9 @@ wss.on('connection', (socket) => {
         } else if (data.type === 'start') {
             findPartner(socket);
         } else if (data.type === 'message' && socket.partner) {
-            socket.partner.send(JSON.stringify({ 
-                type: 'message', 
-                text: data.text, 
+            socket.partner.send(JSON.stringify({
+                type: 'message',
+                text: data.text,
                 sender: socket.username || `User ${socket.userId}`
             }));
         } else if (data.type === 'skip') {
@@ -41,47 +44,54 @@ wss.on('connection', (socket) => {
 
     socket.on('close', () => {
         disconnect(socket);
+        users.delete(userId);
+        updateOnlineCount();
     });
 });
 
 function findPartner(socket) {
-    if (waitingUsers.length > 0) {
-        const partner = waitingUsers.pop();
-        
-        if (partner === socket) {
-            // This should never happen, but just in case
-            socket.send(JSON.stringify({ type: 'error', message: "Can't connect to yourself" }));
+    // Ensure the user isn't already paired
+    if (socket.partner) return;
+
+    for (let i = 0; i < waitingUsers.length; i++) {
+        const partner = waitingUsers[i];
+
+        if (partner !== socket) {
+            waitingUsers.splice(i, 1); // Remove matched user from queue
+            socket.partner = partner;
+            partner.partner = socket;
+
+            socket.send(JSON.stringify({ type: 'connected', partnerName: partner.username || `User ${partner.userId}` }));
+            partner.send(JSON.stringify({ type: 'connected', partnerName: socket.username || `User ${socket.userId}` }));
+
             return;
         }
-
-        socket.partner = partner;
-        partner.partner = socket;
-
-        socket.send(JSON.stringify({ type: 'connected', partnerName: partner.username || `User ${partner.userId}` }));
-        partner.send(JSON.stringify({ type: 'connected', partnerName: socket.username || `User ${socket.userId}` }));
-    } else {
-        socket.send(JSON.stringify({ type: 'noUser' }));
-        waitingUsers.push(socket);
     }
+
+    // No partner found, add to waiting list
+    waitingUsers.push(socket);
+    socket.send(JSON.stringify({ type: 'noUser' }));
 }
 
 function disconnect(socket, isSkip = false) {
-    users = users.filter(u => u !== socket);
     waitingUsers = waitingUsers.filter(u => u !== socket);
 
     if (socket.partner) {
         socket.partner.send(JSON.stringify({ type: 'disconnected' }));
-        if (!isSkip) findPartner(socket.partner);
-        socket.partner.partner = null;
-    }
 
-    socket.partner = null;
-    updateOnlineCount();
+        if (!isSkip) {
+            findPartner(socket.partner);
+        }
+        
+        socket.partner.partner = null;
+        socket.partner = null;
+    }
 }
 
 function updateOnlineCount() {
+    const count = users.size;
     users.forEach(user => {
-        user.send(JSON.stringify({ type: 'online', count: users.length }));
+        user.send(JSON.stringify({ type: 'online', count }));
     });
 }
 
