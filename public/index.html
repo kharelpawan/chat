@@ -6,50 +6,67 @@
     <title>Random Chat</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        #chat { width: 80%; margin: auto; padding: 20px; border: 1px solid #ccc; }
-        #messages { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; }
+        #chat { width: 80%; margin: auto; padding: 20px; border: 1px solid #ccc; display: none; }
+        #messages { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; text-align: left; }
         input { width: 70%; padding: 10px; }
         button { padding: 10px; margin: 5px; }
+        #partnerName { font-weight: bold; }
     </style>
 </head>
 <body>
     <h1>Random Chat</h1>
     <p>Online Users: <span id="onlineCount">0</span></p>
     <button onclick="startChat()">Start</button>
-    <button onclick="skipUser()">Skip</button>
-    <button onclick="stopChat()">Stop</button>
+    <button onclick="skipUser()" disabled>Skip</button>
+    <button onclick="stopChat()" disabled>Stop</button>
+
     <div id="chat">
+        <p>Connected to: <span id="partnerName">None</span></p>
         <div id="messages"></div>
-        <input id="messageInput" type="text" placeholder="Type a message...">
+        <input id="messageInput" type="text" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
         <button onclick="sendMessage()">Send</button>
     </div>
+
     <script>
         let socket = new WebSocket(`ws://${window.location.host}`);
         let connected = false;
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            const messagesDiv = document.getElementById('messages');
+
             if (data.type === 'connected') {
-                document.getElementById('messages').innerHTML = '<p>Connected to a new user!</p>';
+                document.getElementById('partnerName').innerText = data.username;
+                messagesDiv.innerHTML = `<p>Connected to <strong>${data.username}</strong>!</p>`;
                 connected = true;
+                document.getElementById('chat').style.display = 'block';
+                document.querySelector("button[onclick='skipUser()']").disabled = false;
+                document.querySelector("button[onclick='stopChat()']").disabled = false;
             } else if (data.type === 'message') {
-                document.getElementById('messages').innerHTML += `<p>${data.text}</p>`;
+                messagesDiv.innerHTML += `<p><strong>${data.sender}:</strong> ${data.text}</p>`;
             } else if (data.type === 'disconnected') {
-                document.getElementById('messages').innerHTML += '<p>Partner disconnected.</p>';
+                messagesDiv.innerHTML += '<p><em>Partner disconnected.</em></p>';
                 connected = false;
+                document.getElementById('partnerName').innerText = "None";
             } else if (data.type === 'online') {
                 document.getElementById('onlineCount').innerText = data.count;
             }
+
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         };
 
         function startChat() {
-            socket.send(JSON.stringify({ type: 'find' }));
+            socket.send(JSON.stringify({ type: 'start' }));
         }
 
         function sendMessage() {
-            const message = document.getElementById('messageInput').value;
-            document.getElementById('messages').innerHTML += `<p>You: ${message}</p>`;
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            if (!message || !connected) return;
+
+            document.getElementById('messages').innerHTML += `<p><strong>You:</strong> ${message}</p>`;
             socket.send(JSON.stringify({ type: 'message', text: message }));
+            messageInput.value = '';
         }
 
         function skipUser() {
@@ -58,6 +75,12 @@
 
         function stopChat() {
             socket.send(JSON.stringify({ type: 'stop' }));
+            document.getElementById('chat').style.display = 'none';
+            document.getElementById('partnerName').innerText = "None";
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") sendMessage();
         }
     </script>
 </body>
